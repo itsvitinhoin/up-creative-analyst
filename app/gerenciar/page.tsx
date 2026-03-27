@@ -1,17 +1,23 @@
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
-import { Search, RefreshCw, ToggleLeft, ToggleRight, Loader2 } from "lucide-react"
+import { Search, RefreshCw, ToggleLeft, ToggleRight, Loader2, Radar } from "lucide-react"
 import { Sidebar } from "@/components/sidebar"
 import { cn } from "@/lib/utils"
 import type { ManagedAdAccount } from "@/app/api/meta/ad-accounts/route"
+
+interface DiscoverBanner {
+  total: number
+  newAccounts: number
+}
 
 export default function GerenciarPage() {
   const [accounts, setAccounts] = useState<ManagedAdAccount[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [syncing, setSyncing] = useState<string | null>(null) // account id being synced
-  const [syncingAll, setSyncingAll] = useState(false)
+  const [discovering, setDiscovering] = useState(false)
+  const [discoverResult, setDiscoverResult] = useState<DiscoverBanner | null>(null)
   const [updating, setUpdating] = useState<string | null>(null)
 
   const load = () => {
@@ -95,15 +101,20 @@ export default function GerenciarPage() {
     }
   }
 
-  async function syncAll() {
-    setSyncingAll(true)
+  async function discoverAll() {
+    setDiscovering(true)
+    setDiscoverResult(null)
     try {
-      await fetch("/api/sync/meta", { method: "POST" })
-      load()
+      const res = await fetch("/api/meta/discover-accounts", { method: "POST" })
+      const data = await res.json()
+      if (res.ok) {
+        setDiscoverResult({ total: data.total, newAccounts: data.newAccounts })
+        load()
+      }
     } catch (err) {
       console.error(err)
     } finally {
-      setSyncingAll(false)
+      setDiscovering(false)
     }
   }
 
@@ -131,22 +142,43 @@ export default function GerenciarPage() {
                 />
               </div>
               <button
-                onClick={syncAll}
-                disabled={syncingAll}
+                onClick={discoverAll}
+                disabled={discovering}
                 className="flex h-9 items-center gap-2 rounded-md border border-border bg-card px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-50"
               >
-                {syncingAll ? (
+                {discovering ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  <RefreshCw className="h-4 w-4" />
+                  <Radar className="h-4 w-4" />
                 )}
-                Sincronizar tudo
+                Descobrir Contas
               </button>
             </div>
           </div>
         </header>
 
         <main className="p-6">
+          {/* Discovery result banner */}
+          {discoverResult && (
+            <div className="mb-4 flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3">
+              <p className="text-sm text-foreground">
+                <span className="font-medium">{discoverResult.total} contas</span> encontradas no token Meta.{" "}
+                {discoverResult.newAccounts > 0 ? (
+                  <span className="text-emerald-500 font-medium">{discoverResult.newAccounts} nova{discoverResult.newAccounts !== 1 ? "s" : ""} adicionada{discoverResult.newAccounts !== 1 ? "s" : ""}.</span>
+                ) : (
+                  <span className="text-muted-foreground">Nenhuma conta nova.</span>
+                )}{" "}
+                Ative as contas que deseja incluir no dashboard.
+              </p>
+              <button
+                onClick={() => setDiscoverResult(null)}
+                className="ml-4 text-xs text-muted-foreground hover:text-foreground"
+              >
+                Fechar
+              </button>
+            </div>
+          )}
+
           {loading ? (
             <div className="flex h-64 items-center justify-center">
               <p className="text-muted-foreground">Carregando contas...</p>

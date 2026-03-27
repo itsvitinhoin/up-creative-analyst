@@ -278,6 +278,63 @@ export async function syncAccountById(dbAccountId: string): Promise<AccountSyncR
   })
 }
 
+export interface DiscoverResult {
+  total: number
+  newAccounts: number
+}
+
+/**
+ * Discovers all ad accounts the token has access to and upserts them into the DB.
+ * Does NOT sync campaigns, ads, or metrics — just registers accounts so the user
+ * can choose which ones to activate.
+ * New accounts always start with isSelected=false.
+ */
+export async function discoverAccounts(): Promise<DiscoverResult> {
+  const adAccounts = await fetchAdAccounts()
+  let newAccounts = 0
+
+  for (const metaAccount of adAccounts) {
+    const metaAccountId = metaAccount.id
+    const clientName = accountNameToClientName(metaAccount.name)
+    const clientSlug = nameToSlug(clientName)
+
+    const client = await db.client.upsert({
+      where: { slug: clientSlug },
+      create: { name: clientName, slug: clientSlug, status: "active" },
+      update: { name: clientName },
+    })
+
+    const existing = await db.adAccount.findUnique({
+      where: { metaAccountId },
+      select: { id: true },
+    })
+
+    if (!existing) newAccounts++
+
+    await db.adAccount.upsert({
+      where: { metaAccountId },
+      create: {
+        clientId: client.id,
+        metaAccountId,
+        name: metaAccount.name,
+        currency: metaAccount.currency ?? "BRL",
+        timezone: metaAccount.timezone_name ?? "America/Sao_Paulo",
+        accountStatus: metaAccount.account_status ?? 1,
+        isSelected: false,
+        syncEnabled: true,
+      },
+      update: {
+        name: metaAccount.name,
+        accountStatus: metaAccount.account_status ?? 1,
+        updatedAt: new Date(),
+      },
+    })
+  }
+
+  console.log(`[discover] Found ${adAccounts.length} accounts, ${newAccounts} new`)
+  return { total: adAccounts.length, newAccounts }
+}
+
 /**
  * Full sync from Meta: discovers all accounts and syncs each one.
  */

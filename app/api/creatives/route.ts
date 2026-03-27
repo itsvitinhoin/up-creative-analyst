@@ -5,38 +5,53 @@ import { deriveCreativeStatus } from "@/lib/creative-normalizer"
 import { parseDateRange } from "@/lib/date-utils"
 import type { Creative, CreativeStatus, CreativeType } from "@/lib/types"
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(req: NextRequest) {
   if (process.env.DEV_FALLBACK_MOCKS === "true") {
     return NextResponse.json(mockCreatives)
   }
 
   try {
-    const { id: adAccountId } = await params
     const sp = req.nextUrl.searchParams
-
-    const range = parseDateRange(sp)
-    const dateFrom = range.from
-    const dateTo = range.to
-    const statusFilter = sp.get("status") // "active" | "paused" | "mixed" | null
-    const typeFilter = sp.get("type") // "image" | "video" | null
+    const clientId = sp.get("client_id")
+    const accountId = sp.get("account_id")
+    const statusFilter = sp.get("status")
+    const typeFilter = sp.get("type")
     const sortBy = sp.get("sort_by") ?? "spend"
     const order = (sp.get("order") ?? "desc") as "asc" | "desc"
+    const range = parseDateRange(sp)
 
-    // Verify the account exists
-    const account = await db.adAccount.findUnique({ where: { id: adAccountId }, select: { id: true } })
-    if (!account) {
-      return NextResponse.json({ error: "Ad account not found" }, { status: 404 })
+    // Resolve which account IDs to query
+    let accountIds: string[]
+
+    if (accountId) {
+      // Specific account
+      accountIds = [accountId]
+    } else if (clientId) {
+      // All selected accounts for a client
+      const accounts = await db.adAccount.findMany({
+        where: { clientId, isSelected: true },
+        select: { id: true },
+      })
+      accountIds = accounts.map((a) => a.id)
+    } else {
+      // All selected accounts across the system
+      const accounts = await db.adAccount.findMany({
+        where: { isSelected: true },
+        select: { id: true },
+      })
+      accountIds = accounts.map((a) => a.id)
     }
 
-    // Aggregate metrics per creative
+    if (accountIds.length === 0) {
+      return NextResponse.json([])
+    }
+
+    // Aggregate metrics per creative across resolved accounts
     const metricsRows = await db.creativeDailyMetric.groupBy({
       by: ["creativeAssetId"],
       where: {
-        adAccountId,
-        date: { gte: dateFrom, lte: dateTo },
+        adAccountId: { in: accountIds },
+        date: { gte: range.from, lte: range.to },
       },
       _sum: {
         spend: true,
@@ -72,26 +87,21 @@ export async function GET(
       })
     )
 
-    // Fetch creative assets with their linked ad statuses
+    // Fetch creative assets
     const assets = await db.creativeAsset.findMany({
       where: {
-        adAccountId,
-        ...(typeFilter ? { assetType: typeFilter } : {}),
+        adAccountId: { in: accountIds },
+        ...(typeFilter && typeFilter !== "all" ? { assetType: typeFilter } : {}),
       },
       include: {
+        adAccount: { select: { client: { select: { name: true } } } },
         adCreativeLinks: {
           include: {
             ad: {
               select: {
                 effectiveStatus: true,
-                adSet: {
-                  select: {
-                    campaign: {
-                      select: { name: true },
-                    },
-                  },
-                },
                 name: true,
+                adSet: { select: { campaign: { select: { name: true } } } },
               },
             },
           },
@@ -99,36 +109,18 @@ export async function GET(
       },
     })
 
-    let creatives: Creative[] = assets.map((asset) => {
+    let creatives: (Creative & { clientName: string })[] = assets.map((asset) => {
       const adStatuses = asset.adCreativeLinks.map((l) => l.ad.effectiveStatus)
       const status = deriveCreativeStatus(adStatuses) as CreativeStatus
-
       const campaigns = Array.from(
-        new Set(
-          asset.adCreativeLinks
-            .map((l) => l.ad.adSet.campaign.name)
-            .filter(Boolean)
-        )
+        new Set(asset.adCreativeLinks.map((l) => l.ad.adSet.campaign.name).filter(Boolean))
       )
       const ads = asset.adCreativeLinks.map((l) => l.ad.name)
-
       const metrics = metricsMap.get(asset.id) ?? {
-        spend: 0,
-        impressions: 0,
-        clicks: 0,
-        purchases: 0,
-        purchaseValue: 0,
-        ctr: 0,
-        cpc: 0,
-        cpm: 0,
-        cpa: 0,
-        roas: 0,
+        spend: 0, impressions: 0, clicks: 0, purchases: 0, purchaseValue: 0,
+        ctr: 0, cpc: 0, cpm: 0, cpa: 0, roas: 0,
       }
-
-      const name =
-        asset.title ??
-        asset.body?.slice(0, 60) ??
-        `Creative ${asset.metaCreativeId}`
+      const name = asset.title ?? asset.body?.slice(0, 60) ?? `Creative ${asset.metaCreativeId}`
 
       return {
         id: asset.id,
@@ -136,6 +128,7 @@ export async function GET(
         thumbnail: asset.thumbnailUrl ?? asset.sourceUrl ?? "",
         type: asset.assetType as CreativeType,
         status,
+        clientName: asset.adAccount.client.name,
         spend: metrics.spend,
         impressions: metrics.impressions,
         clicks: metrics.clicks,
@@ -152,16 +145,14 @@ export async function GET(
       }
     })
 
-    // Apply status filter
+    // Status filter
     if (statusFilter && statusFilter !== "all") {
       creatives = creatives.filter((c) => c.status === statusFilter)
     }
 
     // Sort
-    const validSortKeys: (keyof Creative)[] = [
-      "spend", "impressions", "clicks", "ctr", "cpc", "cpm", "purchases", "cpa", "roas",
-    ]
-    const sortKey = (validSortKeys.includes(sortBy as keyof Creative) ? sortBy : "spend") as keyof Creative
+    const validSortKeys = ["spend", "impressions", "clicks", "ctr", "cpc", "cpm", "purchases", "cpa", "roas"]
+    const sortKey = (validSortKeys.includes(sortBy) ? sortBy : "spend") as keyof Creative
     creatives.sort((a, b) => {
       const av = (a[sortKey] as number) ?? 0
       const bv = (b[sortKey] as number) ?? 0
@@ -170,7 +161,7 @@ export async function GET(
 
     return NextResponse.json(creatives)
   } catch (err) {
-    console.error("[api/ad-accounts/[id]/creatives]", err)
+    console.error("[api/creatives]", err)
     return NextResponse.json({ error: "Failed to load creatives" }, { status: 500 })
   }
 }

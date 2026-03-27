@@ -5,7 +5,9 @@ import { AlertTriangle, CheckCircle, Info, Image, PlayCircle } from "lucide-reac
 import { Sidebar } from "@/components/sidebar"
 import { InsightCard } from "@/components/insight-card"
 import { TopCreativeCard } from "@/components/top-creative-card"
+import { PeriodFilter } from "@/components/period-filter"
 import { cn } from "@/lib/utils"
+import { type PeriodPreset } from "@/lib/date-utils"
 import type { Insight } from "@/lib/types"
 import type { InsightsResponse, TopCreativeItem } from "@/app/api/insights/route"
 
@@ -16,11 +18,13 @@ export default function InsightsPage() {
   const [insights, setInsights] = useState<Insight[]>([])
   const [topCreatives, setTopCreatives] = useState<TopCreativeItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [period, setPeriod] = useState<PeriodPreset>("last30d")
   const [insightFilter, setInsightFilter] = useState<InsightFilter>("all")
   const [creativeTypeFilter, setCreativeTypeFilter] = useState<CreativeTypeFilter>("all")
 
   useEffect(() => {
-    fetch("/api/insights")
+    setLoading(true)
+    fetch(`/api/insights?period=${period}`)
       .then((r) => r.json())
       .then((data: InsightsResponse) => {
         setInsights(data.insights ?? [])
@@ -28,7 +32,7 @@ export default function InsightsPage() {
       })
       .catch(console.error)
       .finally(() => setLoading(false))
-  }, [])
+  }, [period])
 
   const filteredInsights = useMemo(() => {
     if (insightFilter === "all") return insights
@@ -56,13 +60,14 @@ export default function InsightsPage() {
       <div className="pl-64">
         {/* Header */}
         <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="flex h-16 items-center px-6">
+          <div className="flex h-16 items-center justify-between px-6">
             <div>
               <h1 className="text-lg font-medium text-foreground">Insights</h1>
               <p className="text-sm text-muted-foreground">
                 Alertas e melhores criativos de todos os clientes
               </p>
             </div>
+            <PeriodFilter value={period} onChange={setPeriod} />
           </div>
         </header>
 

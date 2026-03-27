@@ -7,6 +7,7 @@ import { FilterBar } from "@/components/filter-bar"
 import { CreativesGrid } from "@/components/creatives-grid"
 import { CreativeTable } from "@/components/creative-table"
 import { CreativeModal } from "@/components/creative-modal"
+import { type PeriodPreset } from "@/lib/date-utils"
 import type { Client, AdAccount, Creative, CreativeStatus, CreativeType } from "@/lib/types"
 
 export default function CriativosPage() {
@@ -16,9 +17,12 @@ export default function CriativosPage() {
   const [creatives, setCreatives] = useState<Creative[]>([])
   const [loadingCreatives, setLoadingCreatives] = useState(false)
 
-  // Selection state
+  // Selection state — null means "all"
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
   const [selectedAdAccount, setSelectedAdAccount] = useState<AdAccount | null>(null)
+
+  // Period state
+  const [period, setPeriod] = useState<PeriodPreset>("last30d")
 
   // View state
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid")
@@ -36,66 +40,55 @@ export default function CriativosPage() {
 
   // Load clients on mount
   useEffect(() => {
-    fetch("/api/clients")
+    fetch("/api/clients?all=true")
       .then((r) => r.json())
-      .then((data: Client[]) => {
-        setClients(data)
-        if (data.length > 0) {
-          setSelectedClient(data[0])
-        }
-      })
+      .then((data: Client[]) => setClients(Array.isArray(data) ? data : []))
       .catch(console.error)
   }, [])
 
-  // Load ad accounts when client changes
+  // Load all ad accounts when clients load (to populate account selector)
   useEffect(() => {
-    if (!selectedClient) {
-      setAdAccounts([])
-      setSelectedAdAccount(null)
-      return
-    }
-    fetch(`/api/clients/${selectedClient.id}/ad-accounts`)
-      .then((r) => r.json())
-      .then((data: AdAccount[]) => {
-        setAdAccounts(data)
-        setSelectedAdAccount(data.length > 0 ? data[0] : null)
-      })
-      .catch(console.error)
-  }, [selectedClient])
+    if (clients.length === 0) return
+    Promise.all(
+      clients.map((c) =>
+        fetch(`/api/clients/${c.id}/ad-accounts`)
+          .then((r) => r.json())
+          .then((data: AdAccount[]) => data)
+          .catch(() => [] as AdAccount[])
+      )
+    ).then((results) => {
+      setAdAccounts(results.flat())
+    })
+  }, [clients])
 
-  // Load creatives when ad account or filters change
+  // Reset account selection when client changes
+  const handleClientChange = (client: Client | null) => {
+    setSelectedClient(client)
+    setSelectedAdAccount(null)
+  }
+
+  // Load creatives when selection, period, or filters change
   useEffect(() => {
-    if (!selectedAdAccount) {
-      setCreatives([])
-      return
-    }
     setLoadingCreatives(true)
 
     const params = new URLSearchParams({
+      period,
       sort_by: sortBy,
       order: sortOrder,
+      ...(selectedClient ? { client_id: selectedClient.id } : {}),
+      ...(selectedAdAccount ? { account_id: selectedAdAccount.id } : {}),
       ...(statusFilter !== "all" ? { status: statusFilter } : {}),
       ...(typeFilter !== "all" ? { type: typeFilter } : {}),
     })
 
-    fetch(`/api/ad-accounts/${selectedAdAccount.id}/creatives?${params}`)
+    fetch(`/api/creatives?${params}`)
       .then((r) => r.json())
-      .then((data: Creative[]) => setCreatives(data))
+      .then((data: Creative[]) => setCreatives(Array.isArray(data) ? data : []))
       .catch(console.error)
       .finally(() => setLoadingCreatives(false))
-  }, [selectedAdAccount, statusFilter, typeFilter, sortBy, sortOrder])
+  }, [selectedClient, selectedAdAccount, period, statusFilter, typeFilter, sortBy, sortOrder])
 
-  // Handle client change
-  const handleClientChange = (client: Client) => {
-    setSelectedClient(client)
-    setSelectedAdAccount(null)
-    setCreatives([])
-  }
-
-  // Client-side sort/filter (applied after API fetch for responsiveness)
-  const filteredCreatives = useMemo(() => {
-    return creatives
-  }, [creatives])
+  const filteredCreatives = useMemo(() => creatives, [creatives])
 
   return (
     <div className="min-h-screen bg-background">
@@ -109,6 +102,8 @@ export default function CriativosPage() {
           selectedAdAccount={selectedAdAccount}
           onClientChange={handleClientChange}
           onAdAccountChange={setSelectedAdAccount}
+          period={period}
+          onPeriodChange={setPeriod}
         />
 
         <main className="p-6">

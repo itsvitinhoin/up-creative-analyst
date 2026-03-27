@@ -4,20 +4,24 @@ import { useState, useMemo, useEffect } from "react"
 import { Search, TrendingUp, Users, ShoppingBag, DollarSign } from "lucide-react"
 import { Sidebar } from "@/components/sidebar"
 import { ClientCard } from "@/components/client-card"
+import { PeriodFilter } from "@/components/period-filter"
 import type { Client } from "@/lib/types"
+import { type PeriodPreset } from "@/lib/date-utils"
 
 export default function ClientesPage() {
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
+  const [period, setPeriod] = useState<PeriodPreset>("last30d")
 
   useEffect(() => {
-    fetch("/api/clients")
+    setLoading(true)
+    fetch(`/api/clients?period=${period}`)
       .then((r) => r.json())
-      .then((data: Client[]) => setClients(data))
+      .then((data: Client[]) => setClients(Array.isArray(data) ? data : []))
       .catch(console.error)
       .finally(() => setLoading(false))
-  }, [])
+  }, [period])
 
   const filteredClients = useMemo(() => {
     if (!searchQuery) return clients
@@ -40,48 +44,38 @@ export default function ClientesPage() {
 
   const avgRoas = useMemo(() => {
     if (clients.length === 0) return 0
-    const totalRoas = clients.reduce((acc, client) => acc + client.roas, 0)
+    const totalRoas = clients.reduce((acc, c) => acc + c.roas, 0)
     return totalRoas / clients.length
   }, [clients])
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value)
-  }
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value)
 
-  const formatNumber = (value: number) => {
-    return new Intl.NumberFormat("pt-BR").format(value)
-  }
+  const formatNumber = (value: number) =>
+    new Intl.NumberFormat("pt-BR").format(value)
 
   return (
     <div className="min-h-screen bg-background">
       <Sidebar />
-
       <div className="pl-64">
-        {/* Header */}
         <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="flex h-16 items-center justify-between px-6">
             <div>
               <h1 className="text-lg font-medium text-foreground">Clientes</h1>
-              <p className="text-sm text-muted-foreground">
-                Gerencie seus clientes e visualize KPIs
-              </p>
+              <p className="text-sm text-muted-foreground">Gerencie seus clientes e visualize KPIs</p>
             </div>
-
-            {/* Search */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="Buscar cliente..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-9 w-64 rounded-md border border-input bg-background pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
-              />
+            <div className="flex items-center gap-3">
+              <PeriodFilter value={period} onChange={setPeriod} />
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Buscar cliente..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-9 w-56 rounded-md border border-input bg-background pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+                />
+              </div>
             </div>
           </div>
         </header>
@@ -102,7 +96,6 @@ export default function ClientesPage() {
                 </div>
               </div>
             </div>
-
             <div className="rounded-lg border border-border bg-card p-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent">
@@ -110,13 +103,10 @@ export default function ClientesPage() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Investimento Total</p>
-                  <p className="text-2xl font-medium text-foreground">
-                    {formatCurrency(totals.spend)}
-                  </p>
+                  <p className="text-2xl font-medium text-foreground">{formatCurrency(totals.spend)}</p>
                 </div>
               </div>
             </div>
-
             <div className="rounded-lg border border-border bg-card p-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent">
@@ -124,13 +114,10 @@ export default function ClientesPage() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Compras Totais</p>
-                  <p className="text-2xl font-medium text-foreground">
-                    {formatNumber(totals.purchases)}
-                  </p>
+                  <p className="text-2xl font-medium text-foreground">{formatNumber(totals.purchases)}</p>
                 </div>
               </div>
             </div>
-
             <div className="rounded-lg border border-border bg-card p-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent">
@@ -138,15 +125,12 @@ export default function ClientesPage() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">ROAS Médio</p>
-                  <p className="text-2xl font-medium text-foreground">
-                    {avgRoas.toFixed(2)}x
-                  </p>
+                  <p className="text-2xl font-medium text-foreground">{avgRoas.toFixed(2)}x</p>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Section Title */}
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-sm font-medium text-muted-foreground">
               {loading
@@ -155,7 +139,6 @@ export default function ClientesPage() {
             </h2>
           </div>
 
-          {/* Clients Grid */}
           {loading ? (
             <div className="flex h-64 items-center justify-center">
               <p className="text-muted-foreground">Carregando clientes...</p>
@@ -167,7 +150,6 @@ export default function ClientesPage() {
                   <ClientCard key={client.id} client={client} />
                 ))}
               </div>
-
               {filteredClients.length === 0 && (
                 <div className="flex h-64 items-center justify-center">
                   <p className="text-muted-foreground">Nenhum cliente encontrado</p>

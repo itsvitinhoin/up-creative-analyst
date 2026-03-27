@@ -12,6 +12,8 @@ model Client {
   name       String
   slug       String      @unique
   status     String      @default("active")
+  isActive   Boolean     @default(true)
+  isVisible  Boolean     @default(true)
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
   adAccounts AdAccount[]
@@ -26,6 +28,9 @@ model AdAccount {
   currency             String                @default("BRL")
   timezone             String                @default("America/Sao_Paulo")
   accountStatus        Int                   @default(1)
+  isSelected           Boolean               @default(true)
+  syncEnabled          Boolean               @default(true)
+  excludedAt           DateTime?
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
   client               Client                @relation(fields: [clientId], references: [id])

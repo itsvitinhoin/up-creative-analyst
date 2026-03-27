@@ -1,6 +1,8 @@
 "use client"
 
-import { ChevronDown, Calendar } from "lucide-react"
+import { ChevronDown } from "lucide-react"
+import { PeriodFilter } from "@/components/period-filter"
+import { type PeriodPreset } from "@/lib/date-utils"
 import type { Client, AdAccount } from "@/lib/types"
 
 interface TopBarProps {
@@ -8,8 +10,10 @@ interface TopBarProps {
   adAccounts: AdAccount[]
   selectedClient: Client | null
   selectedAdAccount: AdAccount | null
-  onClientChange: (client: Client) => void
-  onAdAccountChange: (account: AdAccount) => void
+  onClientChange: (client: Client | null) => void
+  onAdAccountChange: (account: AdAccount | null) => void
+  period: PeriodPreset
+  onPeriodChange: (period: PeriodPreset) => void
 }
 
 export function TopBar({
@@ -19,10 +23,12 @@ export function TopBar({
   selectedAdAccount,
   onClientChange,
   onAdAccountChange,
+  period,
+  onPeriodChange,
 }: TopBarProps) {
-  const filteredAdAccounts = adAccounts.filter(
-    (account) => account.clientId === selectedClient?.id
-  )
+  const filteredAdAccounts = selectedClient
+    ? adAccounts.filter((account) => account.clientId === selectedClient.id)
+    : adAccounts
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/95 px-6 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -32,14 +38,17 @@ export function TopBar({
           <select
             value={selectedClient?.id || ""}
             onChange={(e) => {
-              const client = clients.find((c) => c.id === e.target.value)
-              if (client) onClientChange(client)
+              const val = e.target.value
+              if (val === "") {
+                onClientChange(null)
+              } else {
+                const client = clients.find((c) => c.id === val)
+                if (client) onClientChange(client)
+              }
             }}
             className="h-9 appearance-none rounded-md border border-border bg-card pl-3 pr-8 text-sm font-medium text-foreground transition-colors hover:bg-accent focus:outline-none focus:ring-1 focus:ring-ring"
           >
-            <option value="" disabled>
-              Selecionar cliente
-            </option>
+            <option value="">Todos os Clientes</option>
             {clients.map((client) => (
               <option key={client.id} value={client.id}>
                 {client.name}
@@ -54,15 +63,17 @@ export function TopBar({
           <select
             value={selectedAdAccount?.id || ""}
             onChange={(e) => {
-              const account = filteredAdAccounts.find((a) => a.id === e.target.value)
-              if (account) onAdAccountChange(account)
+              const val = e.target.value
+              if (val === "") {
+                onAdAccountChange(null)
+              } else {
+                const account = filteredAdAccounts.find((a) => a.id === val)
+                if (account) onAdAccountChange(account)
+              }
             }}
-            disabled={!selectedClient || filteredAdAccounts.length === 0}
-            className="h-9 appearance-none rounded-md border border-border bg-card pl-3 pr-8 text-sm font-medium text-foreground transition-colors hover:bg-accent focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+            className="h-9 appearance-none rounded-md border border-border bg-card pl-3 pr-8 text-sm font-medium text-foreground transition-colors hover:bg-accent focus:outline-none focus:ring-1 focus:ring-ring"
           >
-            <option value="" disabled>
-              Selecionar conta
-            </option>
+            <option value="">Todas as Contas</option>
             {filteredAdAccounts.map((account) => (
               <option key={account.id} value={account.id}>
                 {account.name}
@@ -72,12 +83,8 @@ export function TopBar({
           <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         </div>
 
-        {/* Date Range */}
-        <button className="flex h-9 items-center gap-2 rounded-md border border-border bg-card px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent">
-          <Calendar className="h-4 w-4 text-muted-foreground" />
-          <span>Últimos 30 dias</span>
-          <ChevronDown className="h-4 w-4 text-muted-foreground" />
-        </button>
+        {/* Period Filter */}
+        <PeriodFilter value={period} onChange={onPeriodChange} />
       </div>
 
       {/* User Avatar */}

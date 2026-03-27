@@ -137,20 +137,10 @@ export async function fetchAdSets(metaAccountId: string): Promise<MetaAdSet[]> {
 
 export async function fetchAds(metaAccountId: string): Promise<MetaAd[]> {
   const accountId = metaAccountId.startsWith("act_") ? metaAccountId : `act_${metaAccountId}`
-  const creativeFields = [
-    "id",
-    "name",
-    "body",
-    "title",
-    "image_url",
-    "thumbnail_url",
-    "video_id",
-    "object_story_spec{link_data{image_hash,call_to_action,link,caption,description,message},video_data{video_id,call_to_action}}",
-    "asset_feed_spec{images{hash,url},videos{video_id,thumbnail_url}}",
-  ].join(",")
-
+  // Use a smaller field set to avoid Meta API 500 errors on large accounts
+  const creativeFields = "id,name,body,title,image_url,thumbnail_url,video_id,object_story_spec{link_data{image_hash,call_to_action,link},video_data{video_id,call_to_action}}"
   const fields = `id,name,effective_status,configured_status,adset_id,creative{${creativeFields}}`
-  const url = `${BASE_URL}/${accountId}/ads?fields=${encodeURIComponent(fields)}&limit=100&access_token=${ACCESS_TOKEN}`
+  const url = `${BASE_URL}/${accountId}/ads?fields=${encodeURIComponent(fields)}&limit=50&access_token=${ACCESS_TOKEN}`
   return fetchAllPages<MetaAd>(url)
 }
 

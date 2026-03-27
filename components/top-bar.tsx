@@ -1,10 +1,11 @@
 "use client"
 
 import { ChevronDown, Calendar } from "lucide-react"
-import { clients, adAccounts } from "@/lib/mock-data"
 import type { Client, AdAccount } from "@/lib/types"
 
 interface TopBarProps {
+  clients: Client[]
+  adAccounts: AdAccount[]
   selectedClient: Client | null
   selectedAdAccount: AdAccount | null
   onClientChange: (client: Client) => void
@@ -12,6 +13,8 @@ interface TopBarProps {
 }
 
 export function TopBar({
+  clients,
+  adAccounts,
   selectedClient,
   selectedAdAccount,
   onClientChange,
@@ -51,10 +54,10 @@ export function TopBar({
           <select
             value={selectedAdAccount?.id || ""}
             onChange={(e) => {
-              const account = adAccounts.find((a) => a.id === e.target.value)
+              const account = filteredAdAccounts.find((a) => a.id === e.target.value)
               if (account) onAdAccountChange(account)
             }}
-            disabled={!selectedClient}
+            disabled={!selectedClient || filteredAdAccounts.length === 0}
             className="h-9 appearance-none rounded-md border border-border bg-card pl-3 pr-8 text-sm font-medium text-foreground transition-colors hover:bg-accent focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
           >
             <option value="" disabled>

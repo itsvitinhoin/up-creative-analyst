@@ -1,29 +1,44 @@
 "use client"
 
-import { useState, useMemo } from "react"
-import { AlertTriangle, CheckCircle, Info, Filter, Image, PlayCircle } from "lucide-react"
+import { useState, useMemo, useEffect } from "react"
+import { AlertTriangle, CheckCircle, Info, Image, PlayCircle } from "lucide-react"
 import { Sidebar } from "@/components/sidebar"
 import { InsightCard } from "@/components/insight-card"
 import { TopCreativeCard } from "@/components/top-creative-card"
-import { insights, topCreatives } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
+import type { Insight } from "@/lib/types"
+import type { InsightsResponse, TopCreativeItem } from "@/app/api/insights/route"
 
 type InsightFilter = "all" | "warning" | "success" | "info"
 type CreativeTypeFilter = "all" | "image" | "video"
 
 export default function InsightsPage() {
+  const [insights, setInsights] = useState<Insight[]>([])
+  const [topCreatives, setTopCreatives] = useState<TopCreativeItem[]>([])
+  const [loading, setLoading] = useState(true)
   const [insightFilter, setInsightFilter] = useState<InsightFilter>("all")
   const [creativeTypeFilter, setCreativeTypeFilter] = useState<CreativeTypeFilter>("all")
+
+  useEffect(() => {
+    fetch("/api/insights")
+      .then((r) => r.json())
+      .then((data: InsightsResponse) => {
+        setInsights(data.insights ?? [])
+        setTopCreatives(data.topCreatives ?? [])
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false))
+  }, [])
 
   const filteredInsights = useMemo(() => {
     if (insightFilter === "all") return insights
     return insights.filter((insight) => insight.type === insightFilter)
-  }, [insightFilter])
+  }, [insightFilter, insights])
 
   const filteredTopCreatives = useMemo(() => {
     if (creativeTypeFilter === "all") return topCreatives
     return topCreatives.filter((creative) => creative.type === creativeTypeFilter)
-  }, [creativeTypeFilter])
+  }, [creativeTypeFilter, topCreatives])
 
   const insightCounts = useMemo(() => {
     return {
@@ -32,7 +47,7 @@ export default function InsightsPage() {
       success: insights.filter((i) => i.type === "success").length,
       info: insights.filter((i) => i.type === "info").length,
     }
-  }, [])
+  }, [insights])
 
   return (
     <div className="min-h-screen bg-background">
@@ -103,27 +118,35 @@ export default function InsightsPage() {
             </div>
 
             {/* Top Creatives Grid */}
-            <div className="grid grid-cols-6 gap-4">
-              {filteredTopCreatives.map((creative, index) => (
-                <TopCreativeCard
-                  key={creative.id}
-                  rank={index + 1}
-                  name={creative.name}
-                  clientName={creative.clientName}
-                  thumbnail={creative.thumbnail}
-                  type={creative.type}
-                  roas={creative.roas}
-                  spend={creative.spend}
-                  purchases={creative.purchases}
-                  improvement={creative.improvement}
-                />
-              ))}
-            </div>
-
-            {filteredTopCreatives.length === 0 && (
-              <div className="flex h-48 items-center justify-center rounded-lg border border-dashed border-border">
-                <p className="text-muted-foreground">Nenhum criativo encontrado</p>
+            {loading ? (
+              <div className="flex h-48 items-center justify-center">
+                <p className="text-muted-foreground">Carregando...</p>
               </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-6 gap-4">
+                  {filteredTopCreatives.map((creative, index) => (
+                    <TopCreativeCard
+                      key={creative.id}
+                      rank={index + 1}
+                      name={creative.name}
+                      clientName={creative.clientName}
+                      thumbnail={creative.thumbnail}
+                      type={creative.type}
+                      roas={creative.roas}
+                      spend={creative.spend}
+                      purchases={creative.purchases}
+                      improvement={creative.improvement}
+                    />
+                  ))}
+                </div>
+
+                {filteredTopCreatives.length === 0 && (
+                  <div className="flex h-48 items-center justify-center rounded-lg border border-dashed border-border">
+                    <p className="text-muted-foreground">Nenhum criativo encontrado</p>
+                  </div>
+                )}
+              </>
             )}
           </section>
 
@@ -208,7 +231,7 @@ export default function InsightsPage() {
               ))}
             </div>
 
-            {filteredInsights.length === 0 && (
+            {!loading && filteredInsights.length === 0 && (
               <div className="flex h-48 items-center justify-center rounded-lg border border-dashed border-border">
                 <p className="text-muted-foreground">Nenhum insight encontrado</p>
               </div>

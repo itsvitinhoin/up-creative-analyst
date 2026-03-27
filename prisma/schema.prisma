@@ -1,0 +1,169 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Client {
+  id         String      @id @default(cuid())
+  name       String
+  slug       String      @unique
+  status     String      @default("active")
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  adAccounts AdAccount[]
+  insights   Insight[]
+}
+
+model AdAccount {
+  id                   String                @id @default(cuid())
+  clientId             String
+  metaAccountId        String                @unique
+  name                 String
+  currency             String                @default("BRL")
+  timezone             String                @default("America/Sao_Paulo")
+  accountStatus        Int                   @default(1)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  client               Client                @relation(fields: [clientId], references: [id])
+  campaigns            Campaign[]
+  creativeAssets       CreativeAsset[]
+  creativeDailyMetrics CreativeDailyMetric[]
+
+  @@index([clientId])
+}
+
+model Campaign {
+  id             String    @id @default(cuid())
+  adAccountId    String
+  metaCampaignId String    @unique
+  name           String
+  objective      String?
+  status         String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  adAccount      AdAccount @relation(fields: [adAccountId], references: [id])
+  adSets         AdSet[]
+
+  @@index([adAccountId])
+}
+
+model AdSet {
+  id          String   @id @default(cuid())
+  campaignId  String
+  metaAdSetId String   @unique
+  name        String
+  status      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  campaign    Campaign @relation(fields: [campaignId], references: [id])
+  ads         Ad[]
+
+  @@index([campaignId])
+}
+
+model Ad {
+  id               String           @id @default(cuid())
+  adSetId          String
+  metaAdId         String           @unique
+  metaCreativeId   String?
+  name             String
+  effectiveStatus  String
+  configuredStatus String
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  adSet            AdSet            @relation(fields: [adSetId], references: [id])
+  adCreativeLinks  AdCreativeLink[]
+
+  @@index([adSetId])
+  @@index([metaCreativeId])
+}
+
+model CreativeAsset {
+  id               String                @id @default(cuid())
+  adAccountId      String
+  metaCreativeId   String                @unique
+  assetType        String                // "image" | "video"
+  assetHash        String?
+  sourceUrl        String?
+  thumbnailUrl     String?
+  previewUrl       String?
+  title            String?
+  body             String?
+  headline         String?
+  ctaType          String?
+  destinationUrl   String?
+  firstSeenAt      DateTime              @default(now())
+  lastSeenAt       DateTime              @default(now())
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  adAccount        AdAccount             @relation(fields: [adAccountId], references: [id])
+  adCreativeLinks  AdCreativeLink[]
+  dailyMetrics     CreativeDailyMetric[]
+  insights         Insight[]
+
+  @@index([adAccountId])
+}
+
+model AdCreativeLink {
+  id              String        @id @default(cuid())
+  adId            String
+  creativeAssetId String
+  createdAt       DateTime      @default(now())
+  ad              Ad            @relation(fields: [adId], references: [id])
+  creativeAsset   CreativeAsset @relation(fields: [creativeAssetId], references: [id])
+
+  @@unique([adId, creativeAssetId])
+  @@index([adId])
+  @@index([creativeAssetId])
+}
+
+model CreativeDailyMetric {
+  id              String        @id @default(cuid())
+  creativeAssetId String
+  adAccountId     String
+  date            DateTime      @db.Date
+  spend           Float         @default(0)
+  impressions     Int           @default(0)
+  clicks          Int           @default(0)
+  ctr             Float         @default(0)
+  cpc             Float         @default(0)
+  cpm             Float         @default(0)
+  purchases       Int           @default(0)
+  purchaseValue   Float         @default(0)
+  cpa             Float         @default(0)
+  roas            Float         @default(0)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  creativeAsset   CreativeAsset @relation(fields: [creativeAssetId], references: [id])
+  adAccount       AdAccount     @relation(fields: [adAccountId], references: [id])
+
+  @@unique([creativeAssetId, date])
+  @@index([creativeAssetId])
+  @@index([adAccountId])
+  @@index([date])
+}
+
+model Insight {
+  id              String         @id @default(cuid())
+  clientId        String
+  creativeAssetId String?
+  type            String         // "warning" | "success" | "info"
+  category        String         // "performance" | "budget" | "creative" | "audience"
+  title           String
+  description     String
+  metric          String?
+  value           Float?
+  comparison      Float?
+  date            DateTime
+  createdAt       DateTime       @default(now())
+  client          Client         @relation(fields: [clientId], references: [id])
+  creativeAsset   CreativeAsset? @relation(fields: [creativeAssetId], references: [id])
+
+  @@index([clientId])
+  @@index([creativeAssetId])
+  @@index([date])
+}

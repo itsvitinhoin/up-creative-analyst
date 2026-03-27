@@ -1,22 +1,31 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Search, TrendingUp, Users, ShoppingBag, DollarSign } from "lucide-react"
 import { Sidebar } from "@/components/sidebar"
 import { ClientCard } from "@/components/client-card"
-import { clients } from "@/lib/mock-data"
+import type { Client } from "@/lib/types"
 
 export default function ClientesPage() {
+  const [clients, setClients] = useState<Client[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
+
+  useEffect(() => {
+    fetch("/api/clients")
+      .then((r) => r.json())
+      .then((data: Client[]) => setClients(data))
+      .catch(console.error)
+      .finally(() => setLoading(false))
+  }, [])
 
   const filteredClients = useMemo(() => {
     if (!searchQuery) return clients
     return clients.filter((client) =>
       client.name.toLowerCase().includes(searchQuery.toLowerCase())
     )
-  }, [searchQuery])
+  }, [searchQuery, clients])
 
-  // Calculate totals
   const totals = useMemo(() => {
     return clients.reduce(
       (acc, client) => ({
@@ -27,12 +36,13 @@ export default function ClientesPage() {
       }),
       { spend: 0, purchases: 0, impressions: 0, clicks: 0 }
     )
-  }, [])
+  }, [clients])
 
   const avgRoas = useMemo(() => {
+    if (clients.length === 0) return 0
     const totalRoas = clients.reduce((acc, client) => acc + client.roas, 0)
     return totalRoas / clients.length
-  }, [])
+  }, [clients])
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", {
@@ -139,21 +149,31 @@ export default function ClientesPage() {
           {/* Section Title */}
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-sm font-medium text-muted-foreground">
-              {filteredClients.length} cliente{filteredClients.length !== 1 && "s"}
+              {loading
+                ? "Carregando..."
+                : `${filteredClients.length} cliente${filteredClients.length !== 1 ? "s" : ""}`}
             </h2>
           </div>
 
           {/* Clients Grid */}
-          <div className="grid grid-cols-2 gap-4">
-            {filteredClients.map((client) => (
-              <ClientCard key={client.id} client={client} />
-            ))}
-          </div>
-
-          {filteredClients.length === 0 && (
+          {loading ? (
             <div className="flex h-64 items-center justify-center">
-              <p className="text-muted-foreground">Nenhum cliente encontrado</p>
+              <p className="text-muted-foreground">Carregando clientes...</p>
             </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                {filteredClients.map((client) => (
+                  <ClientCard key={client.id} client={client} />
+                ))}
+              </div>
+
+              {filteredClients.length === 0 && (
+                <div className="flex h-64 items-center justify-center">
+                  <p className="text-muted-foreground">Nenhum cliente encontrado</p>
+                </div>
+              )}
+            </>
           )}
         </main>
       </div>

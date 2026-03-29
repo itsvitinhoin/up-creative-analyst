@@ -13,7 +13,10 @@ export async function GET(req: NextRequest) {
     const onlyVisible = req.nextUrl.searchParams.get("all") !== "true"
 
     const clients = await db.client.findMany({
-      where: onlyVisible ? { isVisible: true } : undefined,
+      where: {
+        ...(onlyVisible ? { isVisible: true } : {}),
+        adAccounts: { some: { isSelected: true } },
+      },
       orderBy: { name: "asc" },
       include: {
         adAccounts: {

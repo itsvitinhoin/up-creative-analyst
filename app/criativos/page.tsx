@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useCallback } from "react"
+import { ChevronLeft, ChevronRight } from "lucide-react"
 import { Sidebar } from "@/components/sidebar"
 import { TopBar } from "@/components/top-bar"
 import { FilterBar } from "@/components/filter-bar"
@@ -35,6 +36,10 @@ export default function CriativosPage() {
   const [sortBy, setSortBy] = useState("spend")
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
 
+  // Pagination
+  const PAGE_SIZE = 24
+  const [page, setPage] = useState(1)
+
   // Modal state
   const [selectedCreative, setSelectedCreative] = useState<Creative | null>(null)
 
@@ -65,6 +70,7 @@ export default function CriativosPage() {
   const handleClientChange = (client: Client | null) => {
     setSelectedClient(client)
     setSelectedAdAccount(null)
+    setPage(1)
   }
 
   // Load creatives when selection, period, or filters change
@@ -83,12 +89,18 @@ export default function CriativosPage() {
 
     fetch(`/api/creatives?${params}`)
       .then((r) => r.json())
-      .then((data: Creative[]) => setCreatives(Array.isArray(data) ? data : []))
+      .then((data: Creative[]) => { setCreatives(Array.isArray(data) ? data : []); setPage(1) })
       .catch(console.error)
       .finally(() => setLoadingCreatives(false))
   }, [selectedClient, selectedAdAccount, period, statusFilter, typeFilter, sortBy, sortOrder])
 
-  const filteredCreatives = useMemo(() => creatives, [creatives])
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(creatives.length / PAGE_SIZE)), [creatives.length])
+  const pagedCreatives = useMemo(
+    () => creatives.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [creatives, page]
+  )
+
+  const goToPage = useCallback((p: number) => setPage(Math.min(Math.max(1, p), totalPages)), [totalPages])
 
   return (
     <div className="min-h-screen bg-background">
@@ -136,21 +148,63 @@ export default function CriativosPage() {
               </div>
             ) : viewMode === "grid" ? (
               <CreativesGrid
-                creatives={filteredCreatives}
+                creatives={pagedCreatives}
                 onCreativeClick={setSelectedCreative}
               />
             ) : (
               <CreativeTable
-                creatives={filteredCreatives}
+                creatives={pagedCreatives}
                 onCreativeClick={setSelectedCreative}
               />
             )}
           </div>
 
+          {/* Pagination */}
           <div className="mt-6 flex items-center justify-between border-t border-border pt-4">
             <p className="text-sm text-muted-foreground">
-              {filteredCreatives.length} criativo{filteredCreatives.length !== 1 && "s"} encontrado{filteredCreatives.length !== 1 && "s"}
+              {creatives.length} criativo{creatives.length !== 1 && "s"} —{" "}
+              página {page} de {totalPages}
             </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => goToPage(page - 1)}
+                disabled={page === 1}
+                className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((p) => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
+                .reduce<(number | "…")[]>((acc, p, i, arr) => {
+                  if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push("…")
+                  acc.push(p)
+                  return acc
+                }, [])
+                .map((p, i) =>
+                  p === "…" ? (
+                    <span key={`ellipsis-${i}`} className="px-1 text-sm text-muted-foreground">…</span>
+                  ) : (
+                    <button
+                      key={p}
+                      onClick={() => goToPage(p as number)}
+                      className={`flex h-8 min-w-[2rem] items-center justify-center rounded-md border px-2 text-sm transition-colors ${
+                        page === p
+                          ? "border-foreground bg-foreground text-background"
+                          : "border-border text-muted-foreground hover:bg-accent hover:text-foreground"
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  )
+                )}
+              <button
+                onClick={() => goToPage(page + 1)}
+                disabled={page === totalPages}
+                className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </main>
       </div>

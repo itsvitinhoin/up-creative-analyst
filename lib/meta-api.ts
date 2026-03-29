@@ -108,16 +108,6 @@ async function fetchAllPages<T>(url: string): Promise<T[]> {
   return results
 }
 
-async function fetchOne<T>(path: string, fields: string): Promise<T> {
-  const url = `${BASE_URL}${path}?fields=${encodeURIComponent(fields)}&access_token=${ACCESS_TOKEN}`
-  const res = await fetch(url)
-  if (!res.ok) {
-    const err = await res.text()
-    throw new Error(`Meta API error ${res.status}: ${err}`)
-  }
-  return res.json() as Promise<T>
-}
-
 // ─── Public API functions ─────────────────────────────────────────────────────
 
 export async function fetchAdAccounts(): Promise<MetaAdAccount[]> {
@@ -157,6 +147,22 @@ export async function fetchAdInsights(
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+export async function fetchVideoSource(metaCreativeId: string): Promise<string | null> {
+  // Step 1: get the video_id from the creative
+  const creativeUrl = `${BASE_URL}/${metaCreativeId}?fields=video_id&access_token=${ACCESS_TOKEN}`
+  const creativeRes = await fetch(creativeUrl)
+  if (!creativeRes.ok) return null
+  const creativeData = await creativeRes.json() as { video_id?: string }
+  if (!creativeData.video_id) return null
+
+  // Step 2: get the source MP4 URL from the video
+  const videoUrl = `${BASE_URL}/${creativeData.video_id}?fields=source&access_token=${ACCESS_TOKEN}`
+  const videoRes = await fetch(videoUrl)
+  if (!videoRes.ok) return null
+  const videoData = await videoRes.json() as { source?: string }
+  return videoData.source ?? null
+}
 
 export function extractPurchases(
   actions?: Array<{ action_type: string; value: string }>

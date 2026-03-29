@@ -32,7 +32,7 @@ export default function GerenciarPage() {
     setLoading(true)
     fetch("/api/meta/ad-accounts")
       .then((r) => r.json())
-      .then((data: ManagedAdAccount[]) => setAccounts(data))
+      .then((data: ManagedAdAccount[]) => setAccounts(Array.isArray(data) ? data : []))
       .catch(console.error)
       .finally(() => setLoading(false))
   }

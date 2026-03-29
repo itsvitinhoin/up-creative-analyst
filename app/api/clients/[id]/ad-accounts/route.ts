@@ -14,7 +14,7 @@ export async function GET(
   try {
     const { id } = await params
     const accounts = await db.adAccount.findMany({
-      where: { clientId: id },
+      where: { clientId: id, isSelected: true },
       select: {
         id: true,
         name: true,

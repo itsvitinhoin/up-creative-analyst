@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
-import { Search, RefreshCw, ToggleLeft, ToggleRight, Loader2, Radar } from "lucide-react"
+import { Search, RefreshCw, ToggleLeft, ToggleRight, Loader2, Radar, Zap } from "lucide-react"
 import { Sidebar } from "@/components/sidebar"
 import { cn } from "@/lib/utils"
 import type { ManagedAdAccount } from "@/app/api/meta/ad-accounts/route"
@@ -11,6 +11,12 @@ interface DiscoverBanner {
   newAccounts: number
 }
 
+interface SyncBanner {
+  synced: number
+  total: number
+  errors: string[]
+}
+
 export default function GerenciarPage() {
   const [accounts, setAccounts] = useState<ManagedAdAccount[]>([])
   const [loading, setLoading] = useState(true)
@@ -18,6 +24,8 @@ export default function GerenciarPage() {
   const [syncing, setSyncing] = useState<string | null>(null) // account id being synced
   const [discovering, setDiscovering] = useState(false)
   const [discoverResult, setDiscoverResult] = useState<DiscoverBanner | null>(null)
+  const [syncingAll, setSyncingAll] = useState(false)
+  const [syncAllResult, setSyncAllResult] = useState<SyncBanner | null>(null)
   const [updating, setUpdating] = useState<string | null>(null)
 
   const load = () => {
@@ -118,6 +126,23 @@ export default function GerenciarPage() {
     }
   }
 
+  async function syncAllActive() {
+    setSyncingAll(true)
+    setSyncAllResult(null)
+    try {
+      const res = await fetch("/api/ad-accounts/sync-selected", { method: "POST" })
+      const data = await res.json()
+      if (res.ok) {
+        setSyncAllResult({ synced: data.synced, total: data.total, errors: data.errors ?? [] })
+        load()
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setSyncingAll(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <Sidebar />
@@ -142,6 +167,19 @@ export default function GerenciarPage() {
                 />
               </div>
               <button
+                onClick={syncAllActive}
+                disabled={syncingAll || selectedCount === 0}
+                className="flex h-9 items-center gap-2 rounded-md border border-border bg-card px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-50"
+                title={selectedCount === 0 ? "Nenhuma conta ativa para sincronizar" : `Sincronizar ${selectedCount} conta${selectedCount !== 1 ? "s" : ""} ativa${selectedCount !== 1 ? "s" : ""}`}
+              >
+                {syncingAll ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Zap className="h-4 w-4" />
+                )}
+                Sincronizar Ativas
+              </button>
+              <button
                 onClick={discoverAll}
                 disabled={discovering}
                 className="flex h-9 items-center gap-2 rounded-md border border-border bg-card px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-50"
@@ -158,6 +196,26 @@ export default function GerenciarPage() {
         </header>
 
         <main className="p-6">
+          {/* Sync all result banner */}
+          {syncAllResult && (
+            <div className="mb-4 flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3">
+              <p className="text-sm text-foreground">
+                <span className="font-medium">{syncAllResult.synced}/{syncAllResult.total} contas</span> sincronizadas com sucesso.{" "}
+                {syncAllResult.errors.length > 0 ? (
+                  <span className="text-amber-500 font-medium">{syncAllResult.errors.length} erro{syncAllResult.errors.length !== 1 ? "s" : ""}.</span>
+                ) : (
+                  <span className="text-emerald-500 font-medium">Tudo atualizado.</span>
+                )}
+              </p>
+              <button
+                onClick={() => setSyncAllResult(null)}
+                className="ml-4 text-xs text-muted-foreground hover:text-foreground"
+              >
+                Fechar
+              </button>
+            </div>
+          )}
+
           {/* Discovery result banner */}
           {discoverResult && (
             <div className="mb-4 flex items-center justify-between rounded-lg border border-border bg-card px-4 py-3">

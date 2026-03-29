@@ -44,6 +44,8 @@ export interface MetaCreativeData {
     }
     video_data?: {
       video_id?: string
+      image_url?: string
+      image_hash?: string
       call_to_action?: { type?: string }
     }
   }
@@ -138,7 +140,7 @@ export async function fetchAdSets(metaAccountId: string): Promise<MetaAdSet[]> {
 export async function fetchAds(metaAccountId: string): Promise<MetaAd[]> {
   const accountId = metaAccountId.startsWith("act_") ? metaAccountId : `act_${metaAccountId}`
   // Use a smaller field set to avoid Meta API 500 errors on large accounts
-  const creativeFields = "id,name,body,title,image_url,thumbnail_url,video_id,object_story_spec{link_data{image_hash,call_to_action,link},video_data{video_id,call_to_action}}"
+  const creativeFields = "id,name,body,title,image_url,thumbnail_url,video_id,object_story_spec{link_data{image_hash,call_to_action,link},video_data{video_id,image_url,image_hash,call_to_action}}"
   const fields = `id,name,effective_status,configured_status,adset_id,creative{${creativeFields}}`
   const url = `${BASE_URL}/${accountId}/ads?fields=${encodeURIComponent(fields)}&limit=50&access_token=${ACCESS_TOKEN}`
   return fetchAllPages<MetaAd>(url)
@@ -192,6 +194,9 @@ export function isVideo(creative: MetaCreativeData): boolean {
 export function extractThumbnail(creative: MetaCreativeData): string | null {
   if (creative.thumbnail_url) return creative.thumbnail_url
   if (creative.image_url) return creative.image_url
+  if (creative.object_story_spec?.video_data?.image_url) {
+    return creative.object_story_spec.video_data.image_url
+  }
   if (creative.asset_feed_spec?.images?.[0]?.url) {
     return creative.asset_feed_spec.images[0].url
   }

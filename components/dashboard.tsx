@@ -25,7 +25,7 @@ export function Dashboard() {
   useEffect(() => {
     fetch("/api/clients")
       .then((r) => r.json())
-      .then((data: Client[]) => setClients(data))
+      .then((data: Client[]) => setClients(Array.isArray(data) ? data : []))
       .catch(console.error)
   }, [])
 

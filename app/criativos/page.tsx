@@ -53,7 +53,7 @@ export default function CriativosPage() {
       clients.map((c) =>
         fetch(`/api/clients/${c.id}/ad-accounts`)
           .then((r) => r.json())
-          .then((data: AdAccount[]) => data)
+          .then((data: AdAccount[]) => Array.isArray(data) ? data : [])
           .catch(() => [] as AdAccount[])
       )
     ).then((results) => {

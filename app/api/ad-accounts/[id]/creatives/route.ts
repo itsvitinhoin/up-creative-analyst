@@ -136,6 +136,7 @@ export async function GET(
         thumbnail: asset.thumbnailUrl ?? asset.sourceUrl ?? "",
         type: asset.assetType as CreativeType,
         status,
+        metaCreativeId: asset.metaCreativeId,
         spend: metrics.spend,
         impressions: metrics.impressions,
         clicks: metrics.clicks,

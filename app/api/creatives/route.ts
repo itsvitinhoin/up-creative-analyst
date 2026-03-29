@@ -129,6 +129,7 @@ export async function GET(req: NextRequest) {
         type: asset.assetType as CreativeType,
         status,
         clientName: asset.adAccount.client.name,
+        metaCreativeId: asset.metaCreativeId,
         spend: metrics.spend,
         impressions: metrics.impressions,
         clicks: metrics.clicks,

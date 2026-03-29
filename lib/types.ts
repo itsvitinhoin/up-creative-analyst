@@ -7,6 +7,8 @@ export interface Creative {
   thumbnail: string
   type: CreativeType
   status: CreativeStatus
+  clientName?: string
+  metaCreativeId?: string
   spend: number
   impressions: number
   clicks: number

@@ -83,6 +83,8 @@ export async function GET(
       thumbnail: asset.thumbnailUrl ?? asset.sourceUrl ?? "",
       type: asset.assetType as CreativeType,
       status,
+      clientName: asset.adAccount.client.name,
+      metaCreativeId: asset.metaCreativeId,
       spend,
       impressions,
       clicks,

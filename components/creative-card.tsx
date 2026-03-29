@@ -80,6 +80,15 @@ export function CreativeCard({ creative, onClick }: CreativeCardProps) {
         <div className="absolute right-2 top-2">
           <StatusBadge status={creative.status} />
         </div>
+
+        {/* Client Tag */}
+        {creative.clientName && (
+          <div className="absolute bottom-2 left-2">
+            <span className="inline-block max-w-[120px] truncate rounded bg-background/80 px-1.5 py-0.5 text-[10px] font-medium text-foreground backdrop-blur-sm">
+              {creative.clientName}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Content */}

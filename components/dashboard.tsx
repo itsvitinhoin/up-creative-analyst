@@ -1,27 +1,44 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useEffect, useState } from "react"
 import Link from "next/link"
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  Users, 
-  Image, 
-  DollarSign, 
-  ShoppingBag, 
+import {
+  TrendingUp,
+  Users,
+  Image,
+  DollarSign,
+  ShoppingBag,
   ArrowRight,
-  AlertTriangle,
-  CheckCircle
 } from "lucide-react"
 import { Sidebar } from "./sidebar"
 import { ClientCard } from "./client-card"
 import { InsightCard } from "./insight-card"
 import { TopCreativeCard } from "./top-creative-card"
-import { clients, insights, topCreatives } from "@/lib/mock-data"
-import { cn } from "@/lib/utils"
+import type { Client, Insight } from "@/lib/types"
+import type { InsightsResponse, TopCreativeItem } from "@/app/api/insights/route"
 
 export function Dashboard() {
-  // Calculate totals
+  const [clients, setClients] = useState<Client[]>([])
+  const [insights, setInsights] = useState<Insight[]>([])
+  const [topCreatives, setTopCreatives] = useState<TopCreativeItem[]>([])
+
+  useEffect(() => {
+    fetch("/api/clients")
+      .then((r) => r.json())
+      .then((data: Client[]) => setClients(data))
+      .catch(console.error)
+  }, [])
+
+  useEffect(() => {
+    fetch("/api/insights")
+      .then((r) => r.json())
+      .then((data: InsightsResponse) => {
+        setInsights(data.insights ?? [])
+        setTopCreatives(data.topCreatives ?? [])
+      })
+      .catch(console.error)
+  }, [])
+
   const totals = useMemo(() => {
     return clients.reduce(
       (acc, client) => ({
@@ -34,12 +51,13 @@ export function Dashboard() {
       }),
       { spend: 0, purchases: 0, impressions: 0, clicks: 0, creativesCount: 0, activeCreatives: 0 }
     )
-  }, [])
+  }, [clients])
 
   const avgRoas = useMemo(() => {
+    if (clients.length === 0) return 0
     const totalRoas = clients.reduce((acc, client) => acc + client.roas, 0)
     return totalRoas / clients.length
-  }, [])
+  }, [clients])
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", {
@@ -193,34 +211,36 @@ export function Dashboard() {
           </div>
 
           {/* Top Creatives Section */}
-          <div className="mt-8">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-medium text-foreground">Top Criativos</h2>
-              <Link
-                href="/insights"
-                className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-              >
-                Ver ranking completo
-                <ArrowRight className="h-4 w-4" />
-              </Link>
+          {topThreeCreatives.length > 0 && (
+            <div className="mt-8">
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-lg font-medium text-foreground">Top Criativos</h2>
+                <Link
+                  href="/insights"
+                  className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+                >
+                  Ver ranking completo
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                {topThreeCreatives.map((creative, index) => (
+                  <TopCreativeCard
+                    key={creative.id}
+                    rank={index + 1}
+                    name={creative.name}
+                    clientName={creative.clientName}
+                    thumbnail={creative.thumbnail}
+                    type={creative.type}
+                    roas={creative.roas}
+                    spend={creative.spend}
+                    purchases={creative.purchases}
+                    improvement={creative.improvement}
+                  />
+                ))}
+              </div>
             </div>
-            <div className="grid grid-cols-3 gap-4">
-              {topThreeCreatives.map((creative, index) => (
-                <TopCreativeCard
-                  key={creative.id}
-                  rank={index + 1}
-                  name={creative.name}
-                  clientName={creative.clientName}
-                  thumbnail={creative.thumbnail}
-                  type={creative.type}
-                  roas={creative.roas}
-                  spend={creative.spend}
-                  purchases={creative.purchases}
-                  improvement={creative.improvement}
-                />
-              ))}
-            </div>
-          </div>
+          )}
         </main>
       </div>
     </div>

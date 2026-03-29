@@ -1,19 +1,28 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Sidebar } from "@/components/sidebar"
 import { TopBar } from "@/components/top-bar"
 import { FilterBar } from "@/components/filter-bar"
 import { CreativesGrid } from "@/components/creatives-grid"
 import { CreativeTable } from "@/components/creative-table"
 import { CreativeModal } from "@/components/creative-modal"
-import { clients, adAccounts, creatives } from "@/lib/mock-data"
+import { type PeriodPreset } from "@/lib/date-utils"
 import type { Client, AdAccount, Creative, CreativeStatus, CreativeType } from "@/lib/types"
 
 export default function CriativosPage() {
-  // Selection state
-  const [selectedClient, setSelectedClient] = useState<Client | null>(clients[0])
-  const [selectedAdAccount, setSelectedAdAccount] = useState<AdAccount | null>(adAccounts[0])
+  // Data state
+  const [clients, setClients] = useState<Client[]>([])
+  const [adAccounts, setAdAccounts] = useState<AdAccount[]>([])
+  const [creatives, setCreatives] = useState<Creative[]>([])
+  const [loadingCreatives, setLoadingCreatives] = useState(false)
+
+  // Selection state — null means "all"
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null)
+  const [selectedAdAccount, setSelectedAdAccount] = useState<AdAccount | null>(null)
+
+  // Period state
+  const [period, setPeriod] = useState<PeriodPreset>("last30d")
 
   // View state
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid")
@@ -29,55 +38,75 @@ export default function CriativosPage() {
   // Modal state
   const [selectedCreative, setSelectedCreative] = useState<Creative | null>(null)
 
-  // Handle client change
-  const handleClientChange = (client: Client) => {
+  // Load clients on mount
+  useEffect(() => {
+    fetch("/api/clients?all=true")
+      .then((r) => r.json())
+      .then((data: Client[]) => setClients(Array.isArray(data) ? data : []))
+      .catch(console.error)
+  }, [])
+
+  // Load all ad accounts when clients load (to populate account selector)
+  useEffect(() => {
+    if (clients.length === 0) return
+    Promise.all(
+      clients.map((c) =>
+        fetch(`/api/clients/${c.id}/ad-accounts`)
+          .then((r) => r.json())
+          .then((data: AdAccount[]) => data)
+          .catch(() => [] as AdAccount[])
+      )
+    ).then((results) => {
+      setAdAccounts(results.flat())
+    })
+  }, [clients])
+
+  // Reset account selection when client changes
+  const handleClientChange = (client: Client | null) => {
     setSelectedClient(client)
-    const firstAccount = adAccounts.find((a) => a.clientId === client.id)
-    setSelectedAdAccount(firstAccount || null)
+    setSelectedAdAccount(null)
   }
 
-  // Filtered and sorted creatives
-  const filteredCreatives = useMemo(() => {
-    let filtered = [...creatives]
+  // Load creatives when selection, period, or filters change
+  useEffect(() => {
+    setLoadingCreatives(true)
 
-    // Apply status filter
-    if (statusFilter !== "all") {
-      filtered = filtered.filter((c) => c.status === statusFilter)
-    }
-
-    // Apply type filter
-    if (typeFilter !== "all") {
-      filtered = filtered.filter((c) => c.type === typeFilter)
-    }
-
-    // Apply sorting
-    filtered.sort((a, b) => {
-      const aValue = a[sortBy as keyof Creative] as number
-      const bValue = b[sortBy as keyof Creative] as number
-      return sortOrder === "desc" ? bValue - aValue : aValue - bValue
+    const params = new URLSearchParams({
+      period,
+      sort_by: sortBy,
+      order: sortOrder,
+      ...(selectedClient ? { client_id: selectedClient.id } : {}),
+      ...(selectedAdAccount ? { account_id: selectedAdAccount.id } : {}),
+      ...(statusFilter !== "all" ? { status: statusFilter } : {}),
+      ...(typeFilter !== "all" ? { type: typeFilter } : {}),
     })
 
-    return filtered
-  }, [statusFilter, typeFilter, sortBy, sortOrder])
+    fetch(`/api/creatives?${params}`)
+      .then((r) => r.json())
+      .then((data: Creative[]) => setCreatives(Array.isArray(data) ? data : []))
+      .catch(console.error)
+      .finally(() => setLoadingCreatives(false))
+  }, [selectedClient, selectedAdAccount, period, statusFilter, typeFilter, sortBy, sortOrder])
+
+  const filteredCreatives = useMemo(() => creatives, [creatives])
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Sidebar */}
       <Sidebar />
 
-      {/* Main Content */}
       <div className="pl-64">
-        {/* Top Bar */}
         <TopBar
+          clients={clients}
+          adAccounts={adAccounts}
           selectedClient={selectedClient}
           selectedAdAccount={selectedAdAccount}
           onClientChange={handleClientChange}
           onAdAccountChange={setSelectedAdAccount}
+          period={period}
+          onPeriodChange={setPeriod}
         />
 
-        {/* Main Area */}
         <main className="p-6">
-          {/* Page Header */}
           <div className="mb-6">
             <h1 className="text-2xl font-medium tracking-tight text-foreground">
               Criativos
@@ -87,7 +116,6 @@ export default function CriativosPage() {
             </p>
           </div>
 
-          {/* Filter Bar */}
           <FilterBar
             viewMode={viewMode}
             onViewModeChange={setViewMode}
@@ -101,9 +129,12 @@ export default function CriativosPage() {
             onSortOrderChange={setSortOrder}
           />
 
-          {/* Content */}
           <div className="mt-6">
-            {viewMode === "grid" ? (
+            {loadingCreatives ? (
+              <div className="flex h-64 items-center justify-center">
+                <p className="text-muted-foreground">Carregando criativos...</p>
+              </div>
+            ) : viewMode === "grid" ? (
               <CreativesGrid
                 creatives={filteredCreatives}
                 onCreativeClick={setSelectedCreative}
@@ -116,7 +147,6 @@ export default function CriativosPage() {
             )}
           </div>
 
-          {/* Stats Footer */}
           <div className="mt-6 flex items-center justify-between border-t border-border pt-4">
             <p className="text-sm text-muted-foreground">
               {filteredCreatives.length} criativo{filteredCreatives.length !== 1 && "s"} encontrado{filteredCreatives.length !== 1 && "s"}
@@ -125,7 +155,6 @@ export default function CriativosPage() {
         </main>
       </div>
 
-      {/* Modal */}
       <CreativeModal
         creative={selectedCreative}
         onClose={() => setSelectedCreative(null)}

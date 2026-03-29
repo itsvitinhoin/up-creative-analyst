@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Users, Image, Lightbulb } from "lucide-react"
+import { LayoutDashboard, Users, Image, Lightbulb, Settings2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const navigation = [
@@ -10,6 +10,10 @@ const navigation = [
   { name: "Clientes", icon: Users, href: "/clientes" },
   { name: "Criativos", icon: Image, href: "/criativos" },
   { name: "Insights", icon: Lightbulb, href: "/insights" },
+]
+
+const management = [
+  { name: "Gerenciar Contas", icon: Settings2, href: "/gerenciar" },
 ]
 
 export function Sidebar() {
@@ -52,12 +56,35 @@ export function Sidebar() {
           </ul>
         </nav>
 
+        {/* Management */}
+        <div className="border-t border-border px-3 py-3">
+          <ul className="flex flex-col gap-1">
+            {management.map((item) => {
+              const isActive = pathname === item.href
+              return (
+                <li key={item.name}>
+                  <Link
+                    href={item.href}
+                    className={cn(
+                      "group flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
+                      isActive
+                        ? "bg-accent text-foreground"
+                        : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                    )}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    {item.name}
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+
         {/* Footer */}
         <div className="border-t border-border p-4">
-          <p className="text-xs text-muted-foreground">
-            Creative Intelligence
-          </p>
-          <p className="text-xs text-muted-foreground/60">v1.0.0</p>
+          <p className="text-xs text-muted-foreground">Creative Intelligence</p>
+          <p className="text-xs text-muted-foreground/60">v1.1.0</p>
         </div>
       </div>
     </aside>

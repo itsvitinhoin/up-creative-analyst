@@ -43,11 +43,21 @@ export function CreativeCard({ creative, onClick }: CreativeCardProps) {
     >
       {/* Thumbnail */}
       <div className="relative aspect-[4/5] overflow-hidden bg-muted">
-        <img
-          src={creative.thumbnail}
-          alt={creative.name}
-          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-        />
+        {creative.thumbnail ? (
+          <img
+            src={creative.thumbnail}
+            alt={creative.name}
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center">
+            {creative.type === "video" ? (
+              <Play className="h-10 w-10 text-muted-foreground/40" />
+            ) : (
+              <ImageIcon className="h-10 w-10 text-muted-foreground/40" />
+            )}
+          </div>
+        )}
         
         {/* Type Badge */}
         <div className="absolute left-2 top-2">
